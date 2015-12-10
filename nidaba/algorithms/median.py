@@ -42,16 +42,24 @@ class ocr_record(object):
         return self
 
     def __add__(self, other):
-        new = ocr_record(self.prediction, self.cuts, self.confidences)
-        if isinstance(other, collections.Iterable):
-            new.prediction += other[0]
-            new.cuts.extend(other[1])
-            new.confidences.extend(other[2])
-        elif isinstance(other, ocr_record):
+        new = ocr_record(self.prediction, list(self.cuts), list(self.confidences))
+        if isinstance(other, ocr_record):
             new.prediction += other.prediction
             new.cuts += other.cuts
             new.confidences += other.confidences
+        elif isinstance(other, collections.Iterable):
+            new.prediction += other[0]
+            new.cuts.extend(other[1])
+            new.confidences.extend(other[2])
+        else:
+            raise TypeError('Invalid argument type')
         return new
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def __iadd__(self, other):
+        return self.__add__(other)
 
     def next(self):
         if self.idx + 1 < len(self):
@@ -192,15 +200,15 @@ def improve_median(candidate, strings, distance_class=naive_edit_distance):
     while True:
         for sym in alphabet:
             # substitution
-            sub = candidate[:i] + sym + candidate[i+1:]
+            sub = candidate[:i] + (sym, [None], [100]) + candidate[i+1:]
             dist = sum([distance.distance(sub, s) for s in strings]) 
             min_dist = (sub, dist) if dist < min_dist[1] else min_dist
             # insertion
-            ins = candidate[:i] + sym + candidate[i:]
+            ins = candidate[:i] + (sym, [None], [100]) + candidate[i:]
             dist = sum([distance.distance(ins, s) for s in strings]) 
             min_dist = (ins, dist) if dist < min_dist[1] else min_dist
         # deletion
-        _del = candidate[i+1:]
+        _del = candidate[:i] + candidate[i+1:]
         dist = sum([distance.distance(_del, s) for s in strings])
         if dist < min_dist[1]:
             min_dist = (_del, dist)
