@@ -19,7 +19,6 @@ import math
 import collections
 
 from nidaba.nidabaexceptions import NidabaAlgorithmException
-from nidaba.algorithms.string import full_edit_distance, edit_distance
 
 # stolen from kraken
 class ocr_record(object):
@@ -151,7 +150,7 @@ class naive_edit_distance(object):
         pass
 
     def distance(self, string, record):
-        return edit_distance(string.prediction, record.prediction)
+        return fast_levenshtein(string.prediction, record.prediction, lambda x,y: 1 if x != y else 0)
 
 
 def approximate_median(strings, distance_class=naive_edit_distance):
