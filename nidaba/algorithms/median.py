@@ -84,6 +84,45 @@ class ocr_record(object):
         else:
             raise TypeError('Invalid argument type')
 
+
+def fast_levenshtein(seq1, seq2, cost_func):
+    """Calculate the Levenshtein distance between sequences.
+
+    This implementation is taken from [0] and available under MIT licence with
+    some minor tweaks to enable symbol-based weighted edit distance calculation
+    (cost function and removal of transposition operation). It runs in O(N*M)
+    time and O(M) space.
+    
+    Args:
+        seq1: A hashable object providing the __getitem__ function
+        seq2: Another hashable object
+        cost_func: Function returning a numeric cost from the i-th character in
+                   seq1 to the j-th character in seq2
+
+    Returns:
+        An integer/float value for the edit distance
+
+    [0] http://mwh.geek.nz/2009/04/26/python-damerau-levenshtein-distance/
+    """
+    # Conceptually, this is based on a len(seq1) + 1 * len(seq2) + 1 matrix.
+    # However, only the current and two previous rows are needed at once,
+    # so we only store those.
+    oneago = None
+    thisrow = range(1, len(seq2) + 1) + [0]
+    for x in xrange(len(seq1)):
+        # Python lists wrap around for negative indices, so put the
+        # leftmost column at the *end* of the list. This matches with
+        # the zero-indexed strings and saves extra calculation.
+        twoago, oneago, thisrow = oneago, thisrow, [0] * len(seq2) + [x + 1]
+        for y in xrange(len(seq2)):
+            cost = cost_func(seq1[x], seq2[y])
+            delcost = oneago[y] + cost
+            addcost = thisrow[y - 1] + cost
+            subcost = oneago[y - 1] + cost
+            thisrow[y] = min(delcost, addcost, subcost)
+    return thisrow[len(seq2) - 1]
+
+
 class confidence_weighted_edit_distance(object):
     """
     Edit distance function using symbol-based confidence weighted edit
@@ -102,8 +141,7 @@ class confidence_weighted_edit_distance(object):
                 return max(tok1[2], tok2[2])
             else:
                 return abs(tok2[2] - tok1[2])
-        m = full_edit_distance(string, record, ins_func=cost, del_func=cost, sub_func=cost)[0]
-        return m[-1][-1]
+        return fast_levenshtein(string, record, cost)
 
 class naive_edit_distance(object):
     """
