@@ -441,7 +441,7 @@ class TEIFacsimile(object):
         """
         Deletes all <line> nodes from the document.
         """
-        for zone in self.doc.iterfind('.//' + self.tei_ns +
+        for zone in self.doc.findall('.//' + self.tei_ns +
                                       "line"):
             zone.getparent().remove(zone)
         self.line_scope = None
@@ -457,7 +457,7 @@ class TEIFacsimile(object):
         engines operating on lexemes. Also resets the current scope to the
         first line (and if applicable its first segment).
         """
-        for zone in self.doc.iterfind('.//' + self.tei_ns +
+        for zone in self.doc.findall('.//' + self.tei_ns +
                                       "zone[@type='grapheme']"):
             zone.getparent().remove(zone)
         self.line_scope = self.doc.find('.//' + self.tei_ns + 'line')
@@ -471,7 +471,7 @@ class TEIFacsimile(object):
         graphemes) and OCR engines operating on lines. Also resets the current
         scope to the first line.
         """
-        for zone in self.doc.iterfind('.//' + self.tei_ns +
+        for zone in self.doc.findall('.//' + self.tei_ns +
                                       "zone[@type='segment']"):
             zone.getparent().remove(zone)
         self.line_scope = self.doc.find('.//' + self.tei_ns + 'line')
