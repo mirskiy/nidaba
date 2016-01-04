@@ -694,6 +694,10 @@ class SimpleBatch(Batch):
         for group, btasks in tasks.iteritems():
             self.add_tick()
             for task in btasks:
+                task_fun = self.celery.app.tasks[u'nidaba.{}.{}'.format(group, task[0])]
+                if task_fun.get_task_type() == 'merge':
+                    self.add_step()
+                    self.add_tick()
                 super(SimpleBatch, self).add_task('{}.{}'.format(group,
                                                                  task[0]),
                                                   **task[1])
