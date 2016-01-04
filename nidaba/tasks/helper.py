@@ -52,9 +52,16 @@ class NidabaTask(Task):
     # a dictionary containing all keyword arguments to the task including valid
     # values
     arg_values = {}
+    type = 'parallel'
 
     def get_valid_args(self):
         return self.arg_values
+
+    def get_task_type(self):
+        """
+        Returns the task type (may either be parallel or merge).
+        """
+        return self.type
 
     def __call__(self, *args, **kwargs):
 
