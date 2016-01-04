@@ -182,8 +182,6 @@ def move_to_storage(batch, kwargs):
               callback=validate_definition, help='A configuration for a '
               'single output layer transformation in the format'
               'task:param1,param2;param1;param1...')
-# @click.option('--willitblend', 'blend',  default=False, help='Blend all '
-#              'output files into a single hOCR document.', is_flag=True)
 @click.option('--grayscale', default=False, help='Skip grayscale '
               'conversion using the ITU-R 601-2 luma transform if the input '
               'documents are already in grayscale.', is_flag=True)
@@ -191,8 +189,8 @@ def move_to_storage(batch, kwargs):
               help='Accesses the documentation of all tasks contained in '
               'nidaba itself and in configured plugins.')
 @click.argument('files', type=click.Path(exists=True), nargs=-1, required=True)
-def batch(files, host, binarize, ocr, segmentation, stats, postprocessing, output,
-          grayscale, help_tasks):
+def batch(files, host, binarize, ocr, segmentation, stats, postprocessing,
+          output, grayscale, help_tasks):
     """
     Add a new job to the pipeline.
     """
