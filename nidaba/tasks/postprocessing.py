@@ -9,12 +9,15 @@ Various postprocessing tasks that operate upon recognized texts.
 
 from __future__ import unicode_literals, print_function, absolute_import
 
+import itertools
+
 from nidaba import storage
 from nidaba import merge_hocr
 from nidaba import lex
 from nidaba.celery import app
 from nidaba.tei import TEIFacsimile
 from nidaba.config import nidaba_cfg
+from nidaba.algorithms import median
 from nidaba.tasks.helper import NidabaTask
 
 from celery.utils.log import get_task_logger
@@ -63,26 +66,57 @@ def spell_check(doc, method=u'spell_check', language=u'',
     return storage.get_storage_path(output_path)
 
 
-# @app.task(base=NidabaTask, name=u'nidaba.postprocessing.blend_hocr')
-# def blend_hocr(doc, method=u'blend_hocr', language=u''):
-#     """
-#     Blends multiple hOCR files using the algorithm from Bruce Robertsons
-#     rigaudon. It requires a working spell checking for the input document's
-#     language; otherwise all matched bboxes will be bunched together without any
-#     scoring.
-#
-#     Args:
-#         doc [(id, path), ...]: A list of storage module tupels that will be
-#         merged into a single output document.
-#         language (unicode): Language used for spell-checking based scoring. If
-#                             not defined no scoring will be used.
-#         method (unicode): The suffix string appended to the output file.
-#
-#     Returns:
-#         (unicode, unicode): Storage tuple of the output document
-#     """
-#     # create the output document path from the first input document
-#     input_path = storage.get_abs_path(*doc[0])
-#     output_path = storage.insert_suffix(input_path, method)
-#     return merge_hocr.merge(doc, language,
-#                             storage.get_storage_path(output_path))
+@app.task(base=NidabaTask, name=u'nidaba.postprocessing.blend', type='merge')
+def blend(doc, method=u'blend'):
+    """
+    Blends multiple hOCR files using the algorithm I cooked up in between
+    thesis procrastination sessions. It is language independent and
+    parameterless.
+
+    Args:
+        doc [(id, path), ...]: A list of storage module tuples that will be
+        merged into a single output document.
+        method (unicode): The suffix string appended to the output file.
+
+    Returns:
+        (unicode, unicode): Storage tuple of the output document
+    """
+    # create the output document path from the first input document
+    input_path = storage.get_abs_path(*doc[0])
+    output_path = storage.insert_suffix(input_path, method)
+    teis = []
+    output = None
+    for i in doc:
+        with storage.StorageFile(*i) as fp:
+            logger.debug('Reading TEI ({})'.format(fp.abs_path))
+            tei = TEIFacsimile()
+            tei.read(fp)
+            teis.append(tei.doc.iter(tei.tei_ns + 'line'))
+            # built skeleton of output file
+            if output is None:
+                fp.seek(0)
+                output = TEIFacsimile()
+                output.read(fp)
+                output.clear_segments()
+                output.add_respstmt('merge', 'confidence-weighted')
+    for lines in itertools.izip(*teis):
+        recs = []
+        line_id = lines[0].get(output.xml_ns + 'id')
+        output.scope_line(line_id)
+        logger.debug('Calculating median for line {}'.format(line_id))
+        for line in lines:
+            certs = []
+            text = u''
+            for g in line.iter(output.tei_ns + 'g'):
+                text += ''.join(g.itertext())
+                # no standoff notation for certainties
+                certs.append(float(line.xpath(".//*[local-name()='certainty' and @target=$tag]", 
+                                              tag='#' + g.get(output.xml_ns +'id'))[0].get('degree')))
+            recs.append(median.ocr_record(text, len(text) * [None], certs))
+        m = median.approximate_median(recs, median.confidence_weighted_edit_distance)
+        logger.debug('Calculated median: {}'.format(m))
+        output.add_graphemes(x for x in m.prediction)
+    with storage.StorageFile(*storage.get_storage_path(output_path), mode='wb') as fp:
+        logger.debug('Writing TEI ({})'.format(fp.abs_path))
+        output.write(fp)
+    return storage.get_storage_path(output_path)
